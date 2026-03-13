@@ -16,11 +16,16 @@ bot = discord.Client(intents=intents)
 tree = app_commands.CommandTree(bot)
 
 TAJJA_ITEMS = [
-    {"name": "고니",   "emoji": "🎴", "weight": 20},
-    {"name": "아귀",   "emoji": "🎴", "weight": 20},
-    {"name": "짝귀",   "emoji": "🎴", "weight": 20},
-    {"name": "평경장", "emoji": "🎴", "weight": 20},
-    {"name": "예림이", "emoji": "🎴", "weight": 20},
+    {"name": "고니",         "emoji": "🎴", "weight": 7},
+    {"name": "아귀",         "emoji": "🎴", "weight": 7},
+    {"name": "짝귀",         "emoji": "🎴", "weight": 7},
+    {"name": "평경장",       "emoji": "🎴", "weight": 7},
+    {"name": "예림이",       "emoji": "🎴", "weight": 7},
+    {"name": "500EXP 상자",  "emoji": "📦", "weight": 20},
+    {"name": "1000EXP 상자", "emoji": "📦", "weight": 20},
+    {"name": "5000EXP 상자", "emoji": "🎁", "weight": 10},
+    {"name": "방뚫권 (1일)", "emoji": "🗝️", "weight": 8},
+    {"name": "방뚫권 (3일)", "emoji": "🔑", "weight": 7},
 ]
 
 BOX_LIST = {
