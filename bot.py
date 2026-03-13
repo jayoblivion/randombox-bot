@@ -16,16 +16,42 @@ bot = discord.Client(intents=intents)
 tree = app_commands.CommandTree(bot)
 
 TAJJA_ITEMS = [
-    {"name": "고니",         "emoji": "🎴", "weight": 7},
-    {"name": "아귀",         "emoji": "🎴", "weight": 7},
-    {"name": "짝귀",         "emoji": "🎴", "weight": 7},
-    {"name": "평경장",       "emoji": "🎴", "weight": 7},
-    {"name": "예림이",       "emoji": "🎴", "weight": 7},
-    {"name": "500EXP 카드",  "emoji": "📦", "weight": 20},
-    {"name": "1000EXP 카드", "emoji": "📦", "weight": 20},
-    {"name": "5000EXP 카드", "emoji": "💎", "weight": 10},
-    {"name": "방뚫권 (1일)", "emoji": "🔑", "weight": 8},
-    {"name": "방뚫권 (3일)", "emoji": "🗝️", "weight": 7},
+    {"name": "고니", "emoji": "🧒🏻", "weight": 0.5},
+    {"name": "평경장", "emoji": "👴🏼", "weight": 0.875},
+    {"name": "아귀", "emoji": "👹", "weight": 0.875},
+    {"name": "짝귀", "emoji": "👂", "weight": 0.875},
+    {"name": "예림이", "emoji": "💃", "weight": 0.875},
+    {"name": "홍단", "emoji": "📜", "weight": 1.5},
+    {"name": "매화", "emoji": "🌸", "weight": 1.5},
+    {"name": "벚꽃", "emoji": "🌸", "weight": 1.5},
+    {"name": "만막", "emoji": "🎑", "weight": 1.5},
+    {"name": "붓꽃", "emoji": "🌿", "weight": 1.5},
+    {"name": "모란꽃", "emoji": "🌺", "weight": 1.7},
+    {"name": "청단", "emoji": "📘", "weight": 1.7},
+    {"name": "나비", "emoji": "🦋", "weight": 1.7},
+    {"name": "난초", "emoji": "🌱", "weight": 1.7},
+    {"name": "국화", "emoji": "🌼", "weight": 1.7},
+    {"name": "벚나무", "emoji": "🌳", "weight": 1.7},
+    {"name": "송학", "emoji": "🦅", "weight": 1.7},
+    {"name": "국준", "emoji": "🍷", "weight": 1.7},
+    {"name": "단풍", "emoji": "🍁", "weight": 1.7},
+    {"name": "홍싸리", "emoji": "🌿", "weight": 1.7},
+    {"name": "개구리", "emoji": "🐸", "weight": 1.7},
+    {"name": "멧돼지", "emoji": "🐗", "weight": 1.7},
+    {"name": "기러기", "emoji": "🦆", "weight": 1.7},
+    {"name": "사슴", "emoji": "🦌", "weight": 1.7},
+    {"name": "봉황", "emoji": "🔥", "weight": 1.7},
+    {"name": "휘파람새", "emoji": "🐦", "weight": 1.7},
+    {"name": "두견새", "emoji": "🐤", "weight": 1.7},
+    {"name": "매조", "emoji": "🦜", "weight": 1.7},
+    {"name": "학", "emoji": "🦢", "weight": 1.7},
+    {"name": "공산", "emoji": "⛰️", "weight": 1.7},
+    {"name": "방뚫권(1일)", "emoji": "🔓", "weight": 4.0},
+    {"name": "방뚫권(3일)", "emoji": "🔐", "weight": 1.0},
+    {"name": "500EXP", "emoji": "💰", "weight": 20.0},
+    {"name": "1000EXP", "emoji": "💵", "weight": 18.5},
+    {"name": "5000EXP", "emoji": "💳", "weight": 9.0},
+    {"name": "한번더", "emoji": "🔄", "weight": 2.0},
 ]
 
 BOX_LIST = {
@@ -36,7 +62,7 @@ BOX_LIST = {
     },
 }
 
-COOLDOWN_SECONDS = 30
+COOLDOWN_SECONDS = 0
 DATA_FILE = "data.json"
 
 def load_data():
