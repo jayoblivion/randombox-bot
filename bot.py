@@ -21,11 +21,11 @@ TAJJA_ITEMS = [
     {"name": "짝귀",         "emoji": "🎴", "weight": 7},
     {"name": "평경장",       "emoji": "🎴", "weight": 7},
     {"name": "예림이",       "emoji": "🎴", "weight": 7},
-    {"name": "500EXP 상자",  "emoji": "📦", "weight": 20},
-    {"name": "1000EXP 상자", "emoji": "📦", "weight": 20},
-    {"name": "5000EXP 상자", "emoji": "🎁", "weight": 10},
-    {"name": "방뚫권 (1일)", "emoji": "🗝️", "weight": 8},
-    {"name": "방뚫권 (3일)", "emoji": "🔑", "weight": 7},
+    {"name": "500EXP 카드",  "emoji": "📦", "weight": 20},
+    {"name": "1000EXP 카드", "emoji": "📦", "weight": 20},
+    {"name": "5000EXP 카드", "emoji": "💎", "weight": 10},
+    {"name": "방뚫권 (1일)", "emoji": "🔑", "weight": 8},
+    {"name": "방뚫권 (3일)", "emoji": "🗝️", "weight": 7},
 ]
 
 BOX_LIST = {
@@ -186,6 +186,51 @@ async def admin_clear_inventory(interaction: discord.Interaction, 유저: discor
         return
     view = AdminConfirmClearView(str(interaction.user.id), str(유저.id), 유저.display_name)
     await interaction.response.send_message(f"⚠️ 정말 **{유저.display_name}**의 인벤토리를 초기화할까요?", view=view, ephemeral=True)
+
+@tree.command(name="관리자_아이템제거", description="특정 유저의 아이템을 제거합니다.")
+async def admin_remove_item(interaction: discord.Interaction, 유저아이디: str, 아이템이름: str):
+    if not is_admin(interaction):
+        await interaction.response.send_message("❌ 권한이 없어요!", ephemeral=True)
+        return
+
+    data = load_data()
+    if 유저아이디 not in data or not data[유저아이디].get("inventory"):
+        await interaction.response.send_message("❌ 해당 유저의 인벤토리가 없어요!", ephemeral=True)
+        return
+
+    inv = data[유저아이디]["inventory"]
+    if 아이템이름 not in inv:
+        await interaction.response.send_message(f"❌ `{아이템이름}` 아이템이 없어요!\n보유 아이템: {', '.join(inv.keys())}", ephemeral=True)
+        return
+
+    del inv[아이템이름]
+    save_data(data)
+    await interaction.response.send_message(f"🗑️ <@{유저아이디}>의 **{아이템이름}** 을 제거했어요!", ephemeral=True)
+
+@tree.command(name="관리자_아이템수량설정", description="특정 유저의 아이템 수량을 설정합니다.")
+async def admin_set_item(interaction: discord.Interaction, 유저아이디: str, 아이템이름: str, 수량: int):
+    if not is_admin(interaction):
+        await interaction.response.send_message("❌ 권한이 없어요!", ephemeral=True)
+        return
+
+    if 수량 < 0:
+        await interaction.response.send_message("❌ 수량은 0 이상이어야 해요!", ephemeral=True)
+        return
+
+    data = load_data()
+    if 유저아이디 not in data:
+        data[유저아이디] = {"inventory": {}}
+    if "inventory" not in data[유저아이디]:
+        data[유저아이디]["inventory"] = {}
+
+    if 수량 == 0:
+        data[유저아이디]["inventory"].pop(아이템이름, None)
+        save_data(data)
+        await interaction.response.send_message(f"🗑️ <@{유저아이디}>의 **{아이템이름}** 을 제거했어요!", ephemeral=True)
+    else:
+        data[유저아이디]["inventory"][아이템이름] = 수량
+        save_data(data)
+        await interaction.response.send_message(f"✅ <@{유저아이디}>의 **{아이템이름}** 을 **{수량}개** 로 설정했어요!", ephemeral=True)
 
 @tree.command(name="확률", description="상자별 아이템 확률을 확인합니다.")
 async def show_rates(interaction: discord.Interaction):
