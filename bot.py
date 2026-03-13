@@ -7,7 +7,7 @@ import time
 
 TOKEN = os.environ.get("TOKEN")
 
-ALLOWED_CHANNEL_ID = 1481967169746112553
+ALLOWED_CHANNEL_IDS = [1481967169746112553, 1482035295338627072]
 
 ADMIN_ROLE_IDS = [1467919008610259198, 1468252935119962152]
 
@@ -58,12 +58,11 @@ def is_admin(interaction: discord.Interaction) -> bool:
     return interaction.user.guild_permissions.administrator or any(r in user_roles for r in ADMIN_ROLE_IDS)
 
 async def check_channel(interaction: discord.Interaction) -> bool:
-    if interaction.channel_id != ALLOWED_CHANNEL_ID:
-        await interaction.response.send_message(f"❌ <#{ALLOWED_CHANNEL_ID}> 채널에서만 사용할 수 있어요!", ephemeral=True)
+    if interaction.channel_id not in ALLOWED_CHANNEL_IDS:
+        await interaction.response.send_message("❌ 해당 채널에서는 사용할 수 없어요!", ephemeral=True)
         return False
     return True
 
-# ✅ 아이템 수정 모달 (수량 입력)
 class EditItemModal(discord.ui.Modal):
     def __init__(self, target_id, target_name, item_name, current_count):
         super().__init__(title=f"{item_name} 수량 수정")
@@ -98,7 +97,6 @@ class EditItemModal(discord.ui.Modal):
             save_data(data)
             await interaction.response.send_message(f"✅ **{self.target_name}**의 **{self.item_name}** 을 **{count}개** 로 설정했어요!", ephemeral=True)
 
-# ✅ 아이템 선택 드롭다운
 class ItemSelectView(discord.ui.View):
     def __init__(self, target_id, target_name, inventory):
         super().__init__(timeout=60)
@@ -121,7 +119,6 @@ class ItemSelectView(discord.ui.View):
         modal = EditItemModal(self.target_id, self.target_name, item_name, current_count)
         await interaction.response.send_modal(modal)
 
-# ✅ 인벤토리 초기화 확인 버튼
 class AdminConfirmClearView(discord.ui.View):
     def __init__(self, admin_id, target_id, target_name):
         super().__init__(timeout=15)
