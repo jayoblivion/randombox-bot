@@ -1,3 +1,2 @@
 .env
-bottoken.env
 data.json
