@@ -63,6 +63,65 @@ async def check_channel(interaction: discord.Interaction) -> bool:
         return False
     return True
 
+# ✅ 아이템 수정 모달 (수량 입력)
+class EditItemModal(discord.ui.Modal):
+    def __init__(self, target_id, target_name, item_name, current_count):
+        super().__init__(title=f"{item_name} 수량 수정")
+        self.target_id = target_id
+        self.target_name = target_name
+        self.item_name = item_name
+        self.amount = discord.ui.TextInput(
+            label=f"수량 입력 (현재: {current_count}개)",
+            placeholder="0 입력 시 아이템 제거",
+            required=True
+        )
+        self.add_item(self.amount)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            count = int(self.amount.value)
+        except ValueError:
+            await interaction.response.send_message("❌ 숫자만 입력해주세요!", ephemeral=True)
+            return
+
+        if count < 0:
+            await interaction.response.send_message("❌ 0 이상의 숫자를 입력해주세요!", ephemeral=True)
+            return
+
+        data = load_data()
+        if count == 0:
+            data[self.target_id]["inventory"].pop(self.item_name, None)
+            save_data(data)
+            await interaction.response.send_message(f"🗑️ **{self.target_name}**의 **{self.item_name}** 을 제거했어요!", ephemeral=True)
+        else:
+            data[self.target_id]["inventory"][self.item_name] = count
+            save_data(data)
+            await interaction.response.send_message(f"✅ **{self.target_name}**의 **{self.item_name}** 을 **{count}개** 로 설정했어요!", ephemeral=True)
+
+# ✅ 아이템 선택 드롭다운
+class ItemSelectView(discord.ui.View):
+    def __init__(self, target_id, target_name, inventory):
+        super().__init__(timeout=60)
+        self.target_id = target_id
+        self.target_name = target_name
+
+        options = [
+            discord.SelectOption(label=f"{name} (현재 {count}개)", value=name)
+            for name, count in inventory.items()
+        ]
+
+        select = discord.ui.Select(placeholder="수정할 아이템을 선택하세요", options=options)
+        select.callback = self.select_callback
+        self.add_item(select)
+
+    async def select_callback(self, interaction: discord.Interaction):
+        item_name = interaction.data["values"][0]
+        data = load_data()
+        current_count = data[self.target_id]["inventory"].get(item_name, 0)
+        modal = EditItemModal(self.target_id, self.target_name, item_name, current_count)
+        await interaction.response.send_modal(modal)
+
+# ✅ 인벤토리 초기화 확인 버튼
 class AdminConfirmClearView(discord.ui.View):
     def __init__(self, admin_id, target_id, target_name):
         super().__init__(timeout=15)
@@ -179,6 +238,29 @@ async def inventory(interaction: discord.Interaction):
     )
     await interaction.response.send_message(embed=embed)
 
+@tree.command(name="관리자_인벤토리수정", description="특정 유저의 인벤토리를 수정합니다.")
+async def admin_edit_inventory(interaction: discord.Interaction, 유저: discord.Member):
+    if not is_admin(interaction):
+        await interaction.response.send_message("❌ 권한이 없어요!", ephemeral=True)
+        return
+
+    target_id = str(유저.id)
+    data = load_data()
+
+    if target_id not in data or not data[target_id].get("inventory"):
+        await interaction.response.send_message(f"❌ **{유저.display_name}**의 인벤토리가 비어있어요!", ephemeral=True)
+        return
+
+    inv = data[target_id]["inventory"]
+    lines = [f"🎴 {name} x{count}" for name, count in inv.items()]
+    embed = discord.Embed(
+        title=f"🎒 {유저.display_name}의 인벤토리",
+        description="\n".join(lines),
+        color=0x3498DB
+    )
+    view = ItemSelectView(target_id, 유저.display_name, inv)
+    await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
 @tree.command(name="관리자_인벤토리초기화", description="특정 유저의 인벤토리를 초기화합니다.")
 async def admin_clear_inventory(interaction: discord.Interaction, 유저: discord.Member):
     if not is_admin(interaction):
@@ -186,51 +268,6 @@ async def admin_clear_inventory(interaction: discord.Interaction, 유저: discor
         return
     view = AdminConfirmClearView(str(interaction.user.id), str(유저.id), 유저.display_name)
     await interaction.response.send_message(f"⚠️ 정말 **{유저.display_name}**의 인벤토리를 초기화할까요?", view=view, ephemeral=True)
-
-@tree.command(name="관리자_아이템제거", description="특정 유저의 아이템을 제거합니다.")
-async def admin_remove_item(interaction: discord.Interaction, 유저아이디: str, 아이템이름: str):
-    if not is_admin(interaction):
-        await interaction.response.send_message("❌ 권한이 없어요!", ephemeral=True)
-        return
-
-    data = load_data()
-    if 유저아이디 not in data or not data[유저아이디].get("inventory"):
-        await interaction.response.send_message("❌ 해당 유저의 인벤토리가 없어요!", ephemeral=True)
-        return
-
-    inv = data[유저아이디]["inventory"]
-    if 아이템이름 not in inv:
-        await interaction.response.send_message(f"❌ `{아이템이름}` 아이템이 없어요!\n보유 아이템: {', '.join(inv.keys())}", ephemeral=True)
-        return
-
-    del inv[아이템이름]
-    save_data(data)
-    await interaction.response.send_message(f"🗑️ <@{유저아이디}>의 **{아이템이름}** 을 제거했어요!", ephemeral=True)
-
-@tree.command(name="관리자_아이템수량설정", description="특정 유저의 아이템 수량을 설정합니다.")
-async def admin_set_item(interaction: discord.Interaction, 유저아이디: str, 아이템이름: str, 수량: int):
-    if not is_admin(interaction):
-        await interaction.response.send_message("❌ 권한이 없어요!", ephemeral=True)
-        return
-
-    if 수량 < 0:
-        await interaction.response.send_message("❌ 수량은 0 이상이어야 해요!", ephemeral=True)
-        return
-
-    data = load_data()
-    if 유저아이디 not in data:
-        data[유저아이디] = {"inventory": {}}
-    if "inventory" not in data[유저아이디]:
-        data[유저아이디]["inventory"] = {}
-
-    if 수량 == 0:
-        data[유저아이디]["inventory"].pop(아이템이름, None)
-        save_data(data)
-        await interaction.response.send_message(f"🗑️ <@{유저아이디}>의 **{아이템이름}** 을 제거했어요!", ephemeral=True)
-    else:
-        data[유저아이디]["inventory"][아이템이름] = 수량
-        save_data(data)
-        await interaction.response.send_message(f"✅ <@{유저아이디}>의 **{아이템이름}** 을 **{수량}개** 로 설정했어요!", ephemeral=True)
 
 @tree.command(name="확률", description="상자별 아이템 확률을 확인합니다.")
 async def show_rates(interaction: discord.Interaction):
