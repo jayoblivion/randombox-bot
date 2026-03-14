@@ -55,7 +55,6 @@ TAJJA_ITEMS = [
     {"name": "한번더", "emoji": "🔄", "weight": 2.0},
 ]
 
-# 카테고리에 재화 항목 추가
 CATEGORIES = {
     "✨ 역할": ["고니", "평경장", "아귀", "짝귀", "예림이"],
     "🎴 고니 재료": ["홍단", "매화", "벚꽃", "만막", "붓꽃"],
@@ -68,11 +67,8 @@ CATEGORIES = {
 }
 
 CRAFT_MAP = {
-    "🎴 고니 재료": "고니",
-    "👴🏼 평경장 재료": "평경장",
-    "👹 아귀 재료": "아귀",
-    "👂 짝귀 재료": "짝귀",
-    "💃 예림이 재료": "예림이"
+    "🎴 고니 재료": "고니", "👴🏼 평경장 재료": "평경장",
+    "👹 아귀 재료": "아귀", "👂 짝귀 재료": "짝귀", "💃 예림이 재료": "예림이"
 }
 
 BOX_LIST = {"타짜상자": {"items": TAJJA_ITEMS, "emoji": "🎴", "color": 0xE74C3C}}
@@ -107,8 +103,9 @@ class EditItemModal(discord.ui.Modal):
         try: count = int(self.amount.value)
         except: return await interaction.response.send_message("❌ 숫자만 입력!", ephemeral=True)
         data = load_data()
-        if count <= 0: data[self.target_id]["inventory"].pop(self.item_name, None)
-        else: data[self.target_id].setdefault("inventory", {})[self.item_name] = count
+        user_data = data.setdefault(self.target_id, {"inventory": {}})
+        if count <= 0: user_data["inventory"].pop(self.item_name, None)
+        else: user_data["inventory"][self.item_name] = count
         save_data(data)
         await interaction.response.send_message(f"✅ **{self.target_name}**의 **{self.item_name}**: {count}개 설정 완료", ephemeral=True)
 
@@ -116,14 +113,26 @@ class ItemSelectView(discord.ui.View):
     def __init__(self, target_id, target_name, inventory):
         super().__init__(timeout=60)
         self.target_id, self.target_name = target_id, target_name
-        options = [discord.SelectOption(label=f"{k} ({v}개)", value=k) for k, v in list(inventory.items())[:25]]
-        select = discord.ui.Select(placeholder="수정할 아이템 선택", options=options)
+        
+        # 인벤토리가 비어있을 때 오류 방지를 위해 기본 옵션 구성
+        options = []
+        for k, v in list(inventory.items())[:15]:
+            options.append(discord.SelectOption(label=f"{k} ({v}개)", value=k))
+            
+        # 가방이 비어있어도 관리자가 추가할 수 있게 주요 아이템들을 선택지에 포함
+        essentials = ["500EXP", "1000EXP", "5000EXP", "고니", "평경장", "아귀", "짝귀", "예림이"]
+        for item in essentials:
+            if item not in inventory and len(options) < 25:
+                options.append(discord.SelectOption(label=f"{item} (추가하기)", value=item))
+
+        select = discord.ui.Select(placeholder="수정/추가할 아이템 선택", options=options)
         select.callback = self.select_callback
         self.add_item(select)
 
     async def select_callback(self, interaction: discord.Interaction):
         item_name = interaction.data["values"][0]
-        curr = load_data()[self.target_id]["inventory"].get(item_name, 0)
+        data = load_data()
+        curr = data.get(self.target_id, {}).get("inventory", {}).get(item_name, 0)
         await interaction.response.send_modal(EditItemModal(self.target_id, self.target_name, item_name, curr))
 
 class AdminConfirmClearView(discord.ui.View):
@@ -185,20 +194,14 @@ async def inventory(interaction: discord.Interaction):
     
     embed = discord.Embed(title=f"🎒 {interaction.user.display_name}의 가방", color=0x3498DB)
     all_listed = []
-    
-    # 💰 재화 합산 기능 추가
     total_exp = 0
     exp_values = {"500EXP": 500, "1000EXP": 1000, "5000EXP": 5000}
-    for e_name, e_val in exp_values.items():
-        total_exp += inv.get(e_name, 0) * e_val
-
+    for e_name, e_val in exp_values.items(): total_exp += inv.get(e_name, 0) * e_val
     embed.description = f"💵 **보유 재화 합계: {total_exp:,} EXP**"
 
     for cat, items in CATEGORIES.items():
         found = [f"{next(i['emoji'] for i in TAJJA_ITEMS if i['name']==n)} {n} x{inv[n]}" for n in items if inv.get(n,0)>0]
-        if found: 
-            embed.add_field(name=cat, value="\n".join(found), inline=False)
-            all_listed.extend(items)
+        if found: embed.add_field(name=cat, value="\n".join(found), inline=False); all_listed.extend(items)
     
     others = [f"{next((i['emoji'] for i in TAJJA_ITEMS if i['name']==k), '💰')} {k} x{v}" for k, v in inv.items() if k not in all_listed and v>0]
     if others: embed.add_field(name="💰 기타", value="\n".join(others), inline=False)
@@ -219,20 +222,25 @@ async def craft(interaction: discord.Interaction):
 
 @tree.command(name="확률")
 async def rates(interaction: discord.Interaction):
+    # [수정] 관리자 전용 권한 체크 추가
+    if not is_admin(interaction):
+        return await interaction.response.send_message("❌ 이 명령어는 관리자만 사용할 수 있습니다.", ephemeral=True)
+
     if not await check_channel(interaction): return
     box = BOX_LIST["타짜상자"]
     total = sum(i["weight"] for i in box["items"])
-    embed = discord.Embed(title="📊 상세 확률표", color=0x2ECC71)
+    embed = discord.Embed(title="📊 상세 확률표 (관리자 전용)", color=0x2ECC71)
     items = sorted(box["items"], key=lambda x: x['weight'])
     for i in range(0, len(items), 12):
         chunk = items[i:i+12]
         embed.add_field(name=f"목록 {i//12+1}", value="\n".join([f"{x['emoji']} {x['name']}: {x['weight']/total*100:.3f}%" for x in chunk]), inline=True)
-    await interaction.response.send_message(embed=embed)
+    await interaction.response.send_message(embed=embed, ephemeral=True) # 개인 메시지로 전송
 
 @tree.command(name="관리자_인벤토리수정")
 async def admin_edit(interaction: discord.Interaction, 유저: discord.Member):
     if not is_admin(interaction): return await interaction.response.send_message("❌ 권한없음", ephemeral=True)
-    inv = load_data().get(str(유저.id), {}).get("inventory", {})
+    data = load_data()
+    inv = data.get(str(유저.id), {}).get("inventory", {})
     await interaction.response.send_message(f"🎒 {유저.display_name} 수정", view=ItemSelectView(str(유저.id), 유저.display_name, inv), ephemeral=True)
 
 @tree.command(name="관리자_인벤토리초기화")
