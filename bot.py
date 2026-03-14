@@ -87,7 +87,7 @@ def is_admin(interaction: discord.Interaction) -> bool:
 
 async def check_channel(interaction: discord.Interaction) -> bool:
     if interaction.channel_id not in ALLOWED_CHANNEL_IDS:
-        await interaction.response.send_message("❌ 해당 채널에서는 사용할 수 없어요!", ephemeral=True)
+        await interaction.response.send_message("❌ 이 명령어는 지정된 뽑기 채널에서만 사용할 수 있어요!", ephemeral=True)
         return False
     return True
 
@@ -165,10 +165,8 @@ class BoxSelectView(discord.ui.View):
             inv[final_item["name"]] = inv.get(final_item["name"], 0) + 1
             save_data(data)
 
-            # --- 뽑기 결과 Embed 생성 (유저 이름 추가) ---
             desc = (" > ".join(log) + " > \n\n" if log else "") + f"{final_item['emoji']} **{final_item['name']}** 획득!"
             embed = discord.Embed(title=f"{box['emoji']} 결과", description=desc, color=box["color"])
-            # 유저의 이름과 아바타를 Embed 상단에 표시
             embed.set_author(name=f"{interaction.user.display_name}님의 결과", icon_url=interaction.user.display_avatar.url)
             
             await interaction.response.edit_message(content="✅ 결과 확인", view=None)
@@ -188,14 +186,15 @@ class BoxSelectView(discord.ui.View):
 @bot.event
 async def on_ready(): await tree.sync(); print(f"✅ {bot.user} 로그인")
 
+# [채널 제한 적용] 뽑기
 @tree.command(name="뽑기")
 async def gacha(interaction: discord.Interaction):
-    if await check_channel(interaction): 
+    if await check_channel(interaction): # 지정 채널에서만 작동
         await interaction.response.send_message("🎁 상자 선택", view=BoxSelectView.create(str(interaction.user.id)), ephemeral=True)
 
+# [채널 제한 해제] 인벤토리는 어디서나 확인 가능
 @tree.command(name="인벤토리")
 async def inventory(interaction: discord.Interaction):
-    if not await check_channel(interaction): return
     inv = load_data().get(str(interaction.user.id), {}).get("inventory", {})
     if not inv: return await interaction.response.send_message("비어있음", ephemeral=True)
     embed = discord.Embed(title=f"🎒 {interaction.user.display_name}의 가방", color=0x3498DB)
@@ -211,24 +210,25 @@ async def inventory(interaction: discord.Interaction):
     if others: embed.add_field(name="💰 기타", value="\n".join(others), inline=False)
     await interaction.response.send_message(embed=embed)
 
+# [채널 제한 적용] 조합
 @tree.command(name="조합")
 async def craft(interaction: discord.Interaction):
-    if not await check_channel(interaction): return
-    user_id, data = str(interaction.user.id), load_data()
-    inv, logs = data.get(user_id, {}).get("inventory", {}), []
-    for cat, res in CRAFT_MAP.items():
-        while all(inv.get(ing, 0) >= 1 for ing in CATEGORIES[cat]):
-            for ing in CATEGORIES[cat]: inv[ing] -= 1
-            inv[res] = inv.get(res, 0) + 1
-            logs.append(f"✨ **{cat}** 성공 ⮕ **{res}**")
-    if not logs: await interaction.response.send_message("❌ 재료 부족", ephemeral=True)
-    else: data[user_id]["inventory"] = {k:v for k,v in inv.items() if v>0}; save_data(data); await interaction.response.send_message("\n".join(logs))
+    if await check_channel(interaction): # 지정 채널에서만 작동
+        user_id, data = str(interaction.user.id), load_data()
+        inv, logs = data.get(user_id, {}).get("inventory", {}), []
+        for cat, res in CRAFT_MAP.items():
+            while all(inv.get(ing, 0) >= 1 for ing in CATEGORIES[cat]):
+                for ing in CATEGORIES[cat]: inv[ing] -= 1
+                inv[res] = inv.get(res, 0) + 1
+                logs.append(f"✨ **{cat}** 성공 ⮕ **{res}**")
+        if not logs: await interaction.response.send_message("❌ 재료 부족", ephemeral=True)
+        else: data[user_id]["inventory"] = {k:v for k,v in inv.items() if v>0}; save_data(data); await interaction.response.send_message("\n".join(logs))
 
+# [채널 제한 해제] 확률은 어디서나 확인 가능 (관리자 전용은 유지)
 @tree.command(name="확률")
 async def rates(interaction: discord.Interaction):
     if not is_admin(interaction):
         return await interaction.response.send_message("❌ 이 명령어는 관리자만 사용할 수 있습니다.", ephemeral=True)
-    if not await check_channel(interaction): return
     box = BOX_LIST["타짜상자"]
     total = sum(i["weight"] for i in box["items"])
     items = sorted(box["items"], key=lambda x: x['weight'], reverse=True)
@@ -239,6 +239,7 @@ async def rates(interaction: discord.Interaction):
     embed.set_footer(text="관리자 전용 데이터입니다.")
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
+# [채널 제한 해제] 관리자 명령어
 @tree.command(name="관리자_인벤토리수정")
 async def admin_edit(interaction: discord.Interaction, 유저: discord.Member):
     if not is_admin(interaction): return await interaction.response.send_message("❌ 권한없음", ephemeral=True)
