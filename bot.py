@@ -15,9 +15,7 @@ intents = discord.Intents.default()
 bot = discord.Client(intents=intents)
 tree = app_commands.CommandTree(bot)
 
-# --- 1. 아이템 구성 (확률 조정 완료) ---
-# 역할 확률 0.5 -> 0.25 / 0.875 -> 0.4375 (기존 대비 절반)
-# 줄어든 확률을 재료(홍단~공산) 25종에 균등 배분 (개당 약 +0.0725)
+# --- 1. 아이템 구성 ---
 TAJJA_ITEMS = [
     {"name": "고니", "emoji": "🧒🏻", "weight": 0.25},
     {"name": "평경장", "emoji": "👴🏼", "weight": 0.4375},
@@ -150,10 +148,6 @@ class BoxSelectView(discord.ui.View):
     def __init__(self, user_id):
         super().__init__(timeout=30)
         self.user_id = user_id
-        for box_name, box_data in BOX_LIST.items():
-            btn = discord.ui.Button(label=f"{box_data['emoji']} {box_name}", style=discord.ButtonStyle.primary)
-            btn.callback = self.make_callback(box_name)
-            self.add_item(btn)
 
     def make_callback(self, box_name):
         async def callback(interaction: discord.Interaction):
@@ -164,15 +158,31 @@ class BoxSelectView(discord.ui.View):
                 item = random.choices(box["items"], weights=[i["weight"] for i in box["items"]], k=1)[0]
                 if item["name"] == "한번더": log.append(f"{item['emoji']} **한번더**"); continue
                 final_item = item; break
+            
             user_id = self.user_id
             if user_id not in data: data[user_id] = {"inventory": {}}
             inv = data[user_id].setdefault("inventory", {})
             inv[final_item["name"]] = inv.get(final_item["name"], 0) + 1
             save_data(data)
+
+            # --- 뽑기 결과 Embed 생성 (유저 이름 추가) ---
             desc = (" > ".join(log) + " > \n\n" if log else "") + f"{final_item['emoji']} **{final_item['name']}** 획득!"
+            embed = discord.Embed(title=f"{box['emoji']} 결과", description=desc, color=box["color"])
+            # 유저의 이름과 아바타를 Embed 상단에 표시
+            embed.set_author(name=f"{interaction.user.display_name}님의 결과", icon_url=interaction.user.display_avatar.url)
+            
             await interaction.response.edit_message(content="✅ 결과 확인", view=None)
-            await interaction.followup.send(embed=discord.Embed(title=f"{box['emoji']} 결과", description=desc, color=box["color"]))
+            await interaction.followup.send(embed=embed)
         return callback
+
+    @classmethod
+    def create(cls, user_id):
+        view = cls(user_id)
+        for box_name, box_data in BOX_LIST.items():
+            btn = discord.ui.Button(label=f"{box_data['emoji']} {box_name}", style=discord.ButtonStyle.primary)
+            btn.callback = view.make_callback(box_name)
+            view.add_item(btn)
+        return view
 
 # --- 4. 명령어 ---
 @bot.event
@@ -180,7 +190,8 @@ async def on_ready(): await tree.sync(); print(f"✅ {bot.user} 로그인")
 
 @tree.command(name="뽑기")
 async def gacha(interaction: discord.Interaction):
-    if await check_channel(interaction): await interaction.response.send_message("🎁 상자 선택", view=BoxSelectView(str(interaction.user.id)), ephemeral=True)
+    if await check_channel(interaction): 
+        await interaction.response.send_message("🎁 상자 선택", view=BoxSelectView.create(str(interaction.user.id)), ephemeral=True)
 
 @tree.command(name="인벤토리")
 async def inventory(interaction: discord.Interaction):
